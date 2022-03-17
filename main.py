@@ -233,6 +233,15 @@ class Game:
         elif player.name == P2:
             return Game.player_1
 
+    def display_text(self):
+        if not self.winner:
+            text = f"Player {self.actual_player.name} turn"
+        else:
+            text = f"Player {self.winner} win!"
+        text_surface = display(text)
+        x_text = Game.window.get_width() - text_surface.get_width() - 8
+        Game.window.blit(text_surface, (x_text, Game.window.get_height() - (LINE_SIZE - 6)))
+
     def run(self):
         while not self.shut_down:
             self.check_quit_game()
@@ -254,14 +263,7 @@ class Game:
             text = f"{P1} : {Game.player_1.score} | {P2} : {Game.player_2.score}"
             Game.window.blit(display(text), (8, Game.window.get_height() - (LINE_SIZE - 6)))
 
-            if not self.winner:
-                text = f"Player {self.actual_player.name} turn"
-            else:
-                text = f"Player {self.winner} win!"
-            text_surface = display(text)
-            x_text = Game.window.get_width() - text_surface.get_width() - 8
-            Game.window.blit(text_surface, (x_text, Game.window.get_height() - (LINE_SIZE - 6)))
-
+            self.display_text()
             pg.display.flip()
 
 
