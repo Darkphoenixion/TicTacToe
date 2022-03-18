@@ -112,9 +112,11 @@ class Game:
     player_1 = Player(P1, Cross())
     player_2 = Player(P2, Circle())
 
+    pg.display.set_caption("Tic Tac Toe")
+
     def __init__(self):
-        pg.display.set_caption("Tic Tac Toe")
-        self.shut_down = False
+        self.run_game = True
+        self.pause = False
         self.main_surface = pg.Surface((SQUARE_GRID_SIZE * TILE_SIZE, SQUARE_GRID_SIZE * TILE_SIZE))
         self.mouse_is_pressed = False
         self.case_group = pg.sprite.Group()
@@ -123,12 +125,16 @@ class Game:
         self.create_grid_game()
 
         self.actual_player = Game.player_1
-        self.winner = ""
+        self.winner = None
+        self.draw = False
 
-    def check_quit_game(self):
-        for event in pg.event.get():
-            if event.type == pg.QUIT:
-                self.shut_down = True
+    def retry(self):
+        self.grid_game = {(x, y): None for x in range(SQUARE_GRID_SIZE) for y in range(SQUARE_GRID_SIZE)}
+        self.case_group.empty()
+        self.create_grid_game()
+        self.winner = None
+        self.draw = False
+        self.run_game = True
 
     def draw_grid(self):
         for _var in range(1, SQUARE_GRID_SIZE):
@@ -151,7 +157,7 @@ class Game:
             self.mouse_is_pressed = True
             self.check_case(mouse_pos)
             self.actual_player = Game.player_turn(self.actual_player)
-            self.check_winner()
+            self.winner = Game.check_game_grid(self.grid_game)
         elif not mouse_left and self.mouse_is_pressed:
             self.mouse_is_pressed = False
 
@@ -160,58 +166,75 @@ class Game:
             for case in self.case_group.sprites():
                 if case.rect.collidepoint(pg.mouse.get_pos()) and case.is_free:
                     case.symbol = self.actual_player.symbol
-                    self.grid_game[pos] = self.actual_player.name
+                    self.grid_game[pos] = self.actual_player
 
-    def check_winner(self):
-        h = Game.check_horizontal(self.grid_game)
-        v = Game.check_vertical(self.grid_game)
-        d = Game.check_diagonal(self.grid_game)
-        self.winner = h + v + d
+    def display_text(self):
+        if not self.winner and self.draw:
+            text = f"Draw! r = Retry"
+        elif not self.winner:
+            text = f"Player {self.actual_player.name} turn"
+        else:
+            text = f"Player {self.winner.name} win! r = Retry"
+        text_surface = display(text)
+        x_text = Game.window.get_width() - text_surface.get_width() - 8
+        Game.window.blit(text_surface, (x_text, Game.window.get_height() - (LINE_SIZE - 6)))
 
     @staticmethod
-    def check_horizontal(grid: dict) -> str:
+    def check_quit_game():
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                sys.exit()
+
+    @staticmethod
+    def input() -> bool:
+        keys = pg.key.get_pressed()
+        return keys[pg.K_r]
+
+    @staticmethod
+    def check_game_grid(grid: dict) -> Player:
+        h = Game.check_horizontal(grid)
+        v = Game.check_vertical(grid)
+        d = Game.check_diagonal(grid)
+        if h:
+            return h
+        elif v:
+            return v
+        elif d:
+            return d
+
+    @staticmethod
+    def check_horizontal(grid: dict) -> Player:
         for y in range(SQUARE_GRID_SIZE):
             _lst = []
             for x in range(SQUARE_GRID_SIZE):
                 _lst.append(grid[(x, y)])
 
-            if _lst.count(P1) >= SQUARE_GRID_SIZE:
-                winner = P1
-                break
-            elif _lst.count(P2) >= SQUARE_GRID_SIZE:
-                winner = P2
-                break
-        else:
-            return ""
-        return winner
+            winner = Game.check_winner(_lst)
+            if winner:
+                return winner
 
     @staticmethod
-    def check_vertical(grid: dict) -> str:
+    def check_vertical(grid: dict) -> Player:
         for x in range(SQUARE_GRID_SIZE):
             _lst = []
             for y in range(SQUARE_GRID_SIZE):
                 _lst.append(grid[(x, y)])
 
-            if _lst.count(P1) >= SQUARE_GRID_SIZE:
-                winner = P1
-                break
-            elif _lst.count(P2) >= SQUARE_GRID_SIZE:
-                winner = P2
-                break
-        else:
-            return ""
-        return winner
+            winner = Game.check_winner(_lst)
+            if winner:
+                return winner
 
     @staticmethod
-    def check_diagonal(grid: dict) -> str:
+    def check_diagonal(grid: dict) -> Player:
         _lst = []
         # premiere diagonale
         for c in range(SQUARE_GRID_SIZE):
             _lst.append(grid[(c, c)])
-        if _lst.count(P1) >= SQUARE_GRID_SIZE:
-            return P1
-        elif _lst.count(P2) >= SQUARE_GRID_SIZE:
-            return P2
+
+        winner = Game.check_winner(_lst)
+        if winner:
+            return winner
 
         _lst = []
         # seconde diagonale
@@ -219,12 +242,21 @@ class Game:
         for y in range(SQUARE_GRID_SIZE):
             x -= 1
             _lst.append(grid[(x, y)])
-        if _lst.count(P1) >= SQUARE_GRID_SIZE:
-            return P1
-        elif _lst.count(P2) >= SQUARE_GRID_SIZE:
-            return P2
 
-        return ""
+        winner = Game.check_winner(_lst)
+        if winner:
+            return winner
+
+    @staticmethod
+    def check_winner(lst: list) -> Player:
+        if lst.count(Game.player_1) >= SQUARE_GRID_SIZE:
+            return Game.player_1
+        elif lst.count(Game.player_2) >= SQUARE_GRID_SIZE:
+            return Game.player_2
+
+    @staticmethod
+    def grid_is_full(grid: dict) -> bool:
+        return list(grid.values()).count(None) == 0
 
     @staticmethod
     def player_turn(player: Player) -> Player:
@@ -233,37 +265,54 @@ class Game:
         elif player.name == P2:
             return Game.player_1
 
-    def display_text(self):
-        if not self.winner:
-            text = f"Player {self.actual_player.name} turn"
-        else:
-            text = f"Player {self.winner} win!"
-        text_surface = display(text)
-        x_text = Game.window.get_width() - text_surface.get_width() - 8
-        Game.window.blit(text_surface, (x_text, Game.window.get_height() - (LINE_SIZE - 6)))
+    @staticmethod
+    def display_scoring():
+        text = f"{P1} : {Game.player_1.score} | {P2} : {Game.player_2.score}"
+        Game.window.blit(display(text), (8, Game.window.get_height() - (LINE_SIZE - 6)))
+
+    @staticmethod
+    def scoring(player: Player):
+        player.score = (player.score + 1) % 99
+
+    def run_party(self):
+
+        self.main_surface.fill(BLOCK_COLOR)
+
+        self.case_group.update()
+        self.case_group.draw(self.main_surface)
+
+        self.draw_grid()
+
+        self.mouse_input()
+
+        self.draw = Game.grid_is_full(self.grid_game) and not self.winner
+
+    def restart(self):
+        if Game.input():
+            self.retry()
 
     def run(self):
-        while not self.shut_down:
-            self.check_quit_game()
+        while True:
+            Game.check_quit_game()
             Game.clock.tick(FPS)
 
             Game.window.fill("Dark Grey")
 
-            self.main_surface.fill(BLOCK_COLOR)
-
-            self.case_group.update()
-            self.case_group.draw(self.main_surface)
-
-            self.draw_grid()
-
-            self.mouse_input()
+            if self.run_game:
+                if self.winner:
+                    self.run_game = False
+                    Game.scoring(self.winner)
+                elif self.draw:
+                    self.run_game = False
+                self.run_party()
+            else:
+                # en attente de recommencer
+                self.restart()
 
             Game.window.blit(self.main_surface, (0, 0))
 
-            text = f"{P1} : {Game.player_1.score} | {P2} : {Game.player_2.score}"
-            Game.window.blit(display(text), (8, Game.window.get_height() - (LINE_SIZE - 6)))
-
             self.display_text()
+            Game.display_scoring()
             pg.display.flip()
 
 
@@ -271,8 +320,5 @@ class Game:
 if __name__ == '__main__':
     game = Game()
     game.run()
-
-    pg.quit()
-    sys.exit()
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
